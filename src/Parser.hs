@@ -49,6 +49,9 @@ lexer = Tok.makeTokenParser langDef
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
 
+braces :: Parser a -> Parser a
+braces = Tok.braces lexer
+
 reserved :: String -> Parser ()
 reserved = Tok.reserved lexer
 
@@ -75,9 +78,9 @@ ident = Tok.identifier lexer
 -- Parse Values 
 funcTypeParser :: Parser Term
 funcTypeParser = do 
-  val <- identParser
+  val <- braces exprParser
   reservedOp "->"
-  rest <- typeParser
+  rest <- exprParser
   return (Func val rest)
 
 identParser :: Parser Term 
@@ -89,6 +92,8 @@ identParser = do
     Nothing -> return (Var name) -- # TODO: decide what's right: fail ("Type " <> name <> " not yet declared")
     Just t -> return t)
   return ty
+
+-- # TODO: remove weird application paranthesis thing
 
 -- helper to search for whether a type has been declared
 {-|
@@ -108,7 +113,7 @@ valueParser = do
   name <- ident 
   ty <- option Type0 ( do 
     reservedOp ":"
-    typeParser)
+    exprParser)
   return (Value name ty)
 
 namedDecParser :: Parser Term 
@@ -127,7 +132,7 @@ paramParser = do
   parens (do
     name <- ident 
     reservedOp ":"
-    ty <- typeParser
+    ty <- exprParser
     return (name, ty))
 
 absParser :: Parser Term 
@@ -141,8 +146,7 @@ absParser = try(do
 -- Parse applications
 appParser :: Parser Term 
 appParser = try (do 
-  t1 <- parens (try namedOrValParser
-    <|> exprParser)
+  t1 <- parens (exprParser)
   t2 <- exprParser
   return (App t1 t2))
 
@@ -184,7 +188,10 @@ exprParser = choice [
     , matchParser
     , namedOrValParser
     , varParser
-    , decParse]
+    , decParse
+    , valueParser
+    , namedDecParser
+    , funcTypeParser]
 
 -- Parse declarations
 decParse :: Parser Term

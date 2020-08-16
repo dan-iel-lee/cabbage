@@ -34,31 +34,57 @@ subs (Func l r) s tt = Func (subs l s tt) (subs r s tt)
 subs (Match m arr) s tt = Match (subs m s tt) $ map (\(t1, t2) -> (t1, subs t2 s tt)) arr
 subs val _ _ = val
 
--- # TODO: should this be Maybe?
 -- perform one step
-step :: Term -> Maybe Term 
-step (Named _ t) = Just t
-step (App (Abs (var, t) x) y) = step y >>= 
-  (\r -> if r == y then
-    (Just $ subs x var r) else
-      Just $ App (Abs (var, t) x) r)
-step (App x y) = step x >>=
-  (\r -> if r == x then
-    (Just $ App x y) else 
-      step $ App r y)
--- step (App _ _) = Nothing -- first argument of Application must be an abstraction
-step (Match m arr) = step m >>= \t -> stepMatch t arr
-step other = Just other
+step :: Term -> Term 
+step (Named _ t) = t
+step (App t1 t2) = if not $ isNormal t1 then App (step t1) t2 else -- if t1 can step, step it
+  if not $ isNormal t2 then App t1 (step t2) else -- if t2 can step, step it
+    case t1 of 
+      Abs (var, _) x -> subs x var t2 -- if t1 is an abstraction, substitute
+      _ -> (App t1 t2)
+step (Match m arr) = if not $ isNormal m then Match (step m) arr else 
+  stepMatch m arr 
+step other = other
 
-stepMatch :: Term -> [(Term, Term)] -> Maybe Term 
-stepMatch (Value s t) arr = fmap snd $ find (\(x, _) -> x == (Value s t)) arr -- find matching value
-stepMatch (App t1 t2) arr = firstJust (matchApp (App t1 t2)) arr
-stepMatch _ _ = Nothing -- I think it only works for Value and App?
+eval :: Term -> Term 
+eval t = let st = step t in 
+  if st == t then t else 
+    eval st
 
+isNormal :: Term -> Bool
+isNormal t = step t == t
+
+stepMatch :: Term -> [(Term, Term)] -> Term 
+stepMatch tt arr = case find (not . isNormal . fst) arr of 
+  Just (l, r) -> 
+    let newArr = map (\(x, y) -> if x == l then (step l, r) else (x, y)) arr in -- if there is a non-normal term, then step it
+      Match tt newArr
+  Nothing -> case tt of 
+    Value s t -> case fmap snd $ find (\(x, _) -> x == (Value s t)) arr of
+                    Just j -> j -- find matching value
+                    Nothing -> Match (Value s t) arr -- doesn't step
+    App t1 t2 -> case firstJust (matchApp (App t1 t2)) arr of 
+                    Just j -> j -- return matching value
+                    Nothing -> Match (App t1 t2) arr -- doesn't step 
+    _ -> Match tt arr -- doesn't step
+
+-- apply match
 matchApp :: Term -> (Term, Term) -> Maybe Term 
 matchApp t (Var s, tt) = Just $ subs tt s t -- if down to a variable, then just substitute
-matchApp (App f1 x1) (App f2 x2, tt) = -- if it's an Application, check we're applying the same things, then recurse
-  if f1 == f2 then matchApp x1 (x2, tt) else Nothing 
+matchApp (Value s1 t1) (Value s2 t2, tt) = if s1 /= s2 then Nothing else 
+  matchApp t1 (t2, tt)
+matchApp (App l1 r1) (App l2 r2, tt) = -- if it's an Application recursively check we're applying the same things
+    do
+  ml <- matchApp l1 (l2, tt) -- match first term
+  matchApp r1 (r2, ml) -- then match second term
+-- types
+matchApp (Func l1 r1) (Func l2 r2, tt) = -- Func type similar to Application
+    do
+  ml <- matchApp l1 (l2, tt) -- match first term
+  matchApp r1 (r2, ml) -- then match second term
+matchApp Type0 (Type0, tt) = Just tt 
+matchApp Type1 (Type1, tt) = Just tt 
+matchApp Type2 (Type2, tt) = Just tt 
 matchApp _ _ = Nothing -- otherwise match fails
 
 

@@ -10,8 +10,13 @@ type Prod : {Type0} -> {Type0} -> Type0
 def Mk = \(A: Type0). \(B: Type0). value Mkprod : {A} -> {B} -> ((Prod) A) B
 
 
-def Mknats = ((Mk) Nat) Nat
-def fst = \(p: ((Prod) Nat) Nat). match p with
-  | ((Mknats) a) b -> a
+def fst1 = \(A: Type0). \(B: Type0). \(p: ((Prod) A) B). match p with
+  | ((((Mk) A) B) a) b -> a
 
-(fst) ((Mknats) Zero) (Succ) Zero
+
+def snd1 = \(A: Type0). \(B: Type0). \(p: ((Prod) A) B). match p with
+  | ((((Mk) A) B) a) b -> b
+
+def Mknats = ((Mk) Nat) Nat
+
+(((snd1) Nat) Nat) ((Mknats) Zero) (Succ) Zero

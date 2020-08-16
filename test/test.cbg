@@ -1,6 +1,6 @@
 type Nat
 value Zero : Nat 
-value Succ : Nat -> Nat 
+value Succ : {Nat} -> Nat 
 
 type Bool 
 value True : Bool
@@ -14,4 +14,4 @@ def minusOrPlusOne = \(b: Bool). \(n: Nat). match b with
   | True -> (Succ) n 
   | False -> (minusOne) n
 
-((minusOrPlusOne) False) (Succ) (Succ) zero
+((minusOrPlusOne) False) (Succ) (Succ) Zero
