@@ -1,0 +1,17 @@
+type Nat
+value Zero : Nat 
+value Succ : Nat -> Nat 
+
+type Bool 
+value True : Bool
+value False : Bool
+
+type Prod : Type0 -> Type0 -> Type0
+def Mk = \(A: Type0). \(B: Type0). value Mkprod : A -> B -> ((Prod) A) B
+
+
+def Mknats = ((Mk) Nat) Nat
+def fst = \(p: ((Prod) Nat) Nat). match p with
+  | ((Mkprod) a) b -> a
+
+(fst) ((Mknats) 1) 2
