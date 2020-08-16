@@ -121,7 +121,7 @@ checkType ctx (Var x) = find (\e -> elName e == x) ctx >>= return . ty
 checkType _ (Value _ t) = Just t 
 checkType ctx (Abs (x, t) tt) = checkType (Elem x t : ctx) tt >>= Just . Func t
 checkType ctx (App t1 t2) = case (checkType ctx t1, checkType ctx t2) of
-  (Just (Func ct1 rt), Just ct2) -> if ct1 == ct2 then Just rt else Nothing 
+  (Just (Func ct1 rt), Just ct2) -> if ct1 == ct2 then Just $ subs rt  else Nothing 
   _ -> Nothing 
 checkType ctx (Match m (x : xs)) =
   (do
