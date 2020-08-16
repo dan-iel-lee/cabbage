@@ -3,13 +3,17 @@ module Parser where
 
 import Data.Maybe
 import Text.Parsec
+import Text.Parsec.Prim
 import Data.List (find)
 import qualified Text.Parsec.Token as Tok
 import qualified Text.Parsec.Expr as Ex
 import Data.Functor.Identity (Identity)
 import DepTypes
 
-type Parser = Parsec String [Term]
+type Parser = Parsec String [Identifier]
+
+data Identifier = Named { name :: String
+                        , term :: Term} deriving (Show)
 
 reservedNames = [
   "type",
@@ -27,7 +31,7 @@ reservedOps = [
   "=",
   "."]
 
-langDef :: Tok.LanguageDef [Term]
+langDef :: Tok.LanguageDef [Identifier]
 langDef  = Tok.LanguageDef
   {
     Tok.commentStart = ""
@@ -43,7 +47,7 @@ langDef  = Tok.LanguageDef
   , Tok.caseSensitive   = True
   }
 
-lexer :: Tok.TokenParser [Term]
+lexer :: Tok.TokenParser [Identifier]
 lexer = Tok.makeTokenParser langDef
 
 parens :: Parser a -> Parser a
@@ -63,6 +67,16 @@ reservedOp = Tok.reservedOp lexer
 
 symbol :: String -> Parser String
 symbol s = Tok.symbol lexer s
+
+-- parse wrapper to check type after parsing a term 
+checkTypeParse :: Parser Term -> Parser Term 
+checkTypeParse p = do
+  pos <- getPosition
+  e <- p
+  state <- getState
+  (case checkType [] e of 
+    Nothing -> error $ "Check type failed " <> (show pos) <> (show state)
+    Just _ -> return e)
 
 {-|
 prefixOp :: String -> (a -> a) -> Ex.Operator String () Identity a
@@ -107,16 +121,26 @@ typeParser :: Parser Term
 typeParser = do
   (try funcTypeParser) <|> identParser
 
-valueParser :: Parser Term 
-valueParser = do
+valueParserHelper :: Parser (String, Term)
+valueParserHelper = do
   (reserved "value" <|> reserved "type")
   name <- ident 
   ty <- option Type0 ( do 
     reservedOp ":"
     exprParser)
+  return (name, ty)
+
+valueParser :: Parser Term 
+valueParser = do
+  (name, ty) <- valueParserHelper
   return (Value name ty)
 
-namedDecParser :: Parser Term 
+valueDecParser :: Parser Identifier
+valueDecParser = do
+  (name, ty) <- valueParserHelper
+  return (Named name (Value name ty))
+
+namedDecParser :: Parser Identifier 
 namedDecParser = do
   reserved "def"
   name <- ident
@@ -175,6 +199,11 @@ namedOrValParser = try (do
     Nothing -> fail $ "Function " <> name <> " doesn't exist")
   return term)
 
+type0Parser :: Parser Term 
+type0Parser = do
+  try (symbol "Type0")
+  return Type0
+
 varParser :: Parser Term 
 varParser = try(do 
   name <- ident
@@ -183,46 +212,39 @@ varParser = try(do
 -- General expression parser
 exprParser :: Parser Term 
 exprParser = choice [
-      appParser
+      type0Parser
+    , appParser
     , absParser 
     , matchParser
     , namedOrValParser
     , varParser
-    , decParse
     , valueParser
-    , namedDecParser
     , funcTypeParser]
+  
 
 -- Parse declarations
 decParse :: Parser Term
 decParse = do
-  dec <- valueParser
+  dec <- valueDecParser
     <|> namedDecParser
-  modifyState ((:) dec)
-  return dec
+  checkTypeParse (return (term dec)) -- check type before... 
+  modifyState ((:) (Named (name dec) (eval $ term dec))) -- evaluating
+  return (term dec)
 
-allDecParse :: Parser [Term]
-allDecParse = do
-  t <- many (decParse <|> do
-    many (char '\n')
-    decParse)
-  return t
+allDecParse :: Parser ()
+allDecParse = do 
+  many decParse
+  return ()
 
 finalParse :: Parser Term 
 finalParse = do
   allDecParse 
   many (char '\n')
-  exprParser
+  checkTypeParse exprParser
+
 
 testParser s = runParser exprParser [] "" s
 
-parseAll :: String -> Either ParseError [Term]
-parseAll s = runParser allDecParse [] "" s
-
-parseFromFile :: FilePath -> IO (Either ParseError [Term])
-parseFromFile fpath = do 
-  input <- readFile fpath 
-  return (parseAll input)
 
 parseFinalExp :: String -> Either ParseError Term
 parseFinalExp s = runParser finalParse [] "" s
@@ -231,6 +253,11 @@ parseExpFromFile :: FilePath -> IO (Either ParseError Term)
 parseExpFromFile fpath = do 
   input <- readFile fpath 
   return (parseFinalExp input)
+
+
+
+
+
 
 -- debug playground
 parse1 :: Parser Term 
@@ -270,8 +297,5 @@ contents p = do
 
 
 -- helper to find a term named such
-findNamed :: String -> [Term] -> Maybe Term 
-findNamed s arr = listToMaybe $ mapMaybe (\t -> case t of
-  Named name t -> if name == s then Just (Named name t) else Nothing
-  Value v t -> if s == v then (Just $ Value v t) else Nothing
-  _ -> Nothing) arr
+findNamed :: String -> [Identifier] -> Maybe Term 
+findNamed s arr = listToMaybe $ mapMaybe (\(Named name t) -> if name == s then Just t else Nothing) arr

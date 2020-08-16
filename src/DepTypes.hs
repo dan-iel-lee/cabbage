@@ -11,7 +11,6 @@ data Term =
   | Abs (String, Term) Term
   | App Term Term
   | Match Term [(Term, Term)]
-  | Named String Term 
   
   | Func Term Term
   | Type0
@@ -19,6 +18,9 @@ data Term =
   | Type2
   deriving (Eq, Show)
 
+data ContextElement = Elem  { elName :: String 
+                            , ty :: Term }
+  deriving (Show)
 
 -- subs T s tt = T[s/tt]
 subs :: Term -> String -> Term -> Term 
@@ -36,7 +38,6 @@ subs val _ _ = val
 
 -- perform one step
 step :: Term -> Term 
-step (Named _ t) = t
 step (App t1 t2) = if not $ isNormal t1 then App (step t1) t2 else -- if t1 can step, step it
   if not $ isNormal t2 then App t1 (step t2) else -- if t2 can step, step it
     case t1 of 
@@ -46,14 +47,17 @@ step (Match m arr) = if not $ isNormal m then Match (step m) arr else
   stepMatch m arr 
 step other = other
 
+-- eval = step until no more stepping
 eval :: Term -> Term 
 eval t = let st = step t in 
   if st == t then t else 
     eval st
 
+-- check if term can still step
 isNormal :: Term -> Bool
 isNormal t = step t == t
 
+-- helper for stepping on a Match
 stepMatch :: Term -> [(Term, Term)] -> Term 
 stepMatch tt arr = case find (not . isNormal . fst) arr of 
   Just (l, r) -> 
@@ -68,7 +72,7 @@ stepMatch tt arr = case find (not . isNormal . fst) arr of
                     Nothing -> Match (App t1 t2) arr -- doesn't step 
     _ -> Match tt arr -- doesn't step
 
--- apply match
+-- apply match to one term
 matchApp :: Term -> (Term, Term) -> Maybe Term 
 matchApp t (Var s, tt) = Just $ subs tt s t -- if down to a variable, then just substitute
 matchApp (Value s1 t1) (Value s2 t2, tt) = if s1 /= s2 then Nothing else 
@@ -88,33 +92,62 @@ matchApp Type2 (Type2, tt) = Just tt
 matchApp _ _ = Nothing -- otherwise match fails
 
 
-checkType :: Term -> Maybe Term 
-checkType (Named _ t) = checkType t
-checkType (Var _) = undefined -- # TODO make CONTEXT
-checkType (Value _ t) = Just t 
-checkType (Abs (_, t) tt) = checkType tt >>= Just . Func t
-checkType (App t1 t2) = case (checkType t1, checkType t2) of
+
+
+
+-- helper for inferTypes
+checkFuncTypeEqualityModVar :: Term -> Term -> Bool 
+checkFuncTypeEqualityModVar (Func l1 r1) (Func l2 r2) = (case (l1, l2) of
+  (Var _, _) -> True 
+  (_, Var _) -> True
+  (_, _) -> l1 == l2) && checkFuncTypeEqualityModVar r1 r2
+checkFuncTypeEqualityModVar t1 t2 = t1 == t2
+
+-- infer types in a match term
+inferTypes :: Term -> Term -> Maybe (Term, [ContextElement])
+inferTypes tt (Value _ t) = if (checkFuncTypeEqualityModVar t tt) then Just (t, []) else Nothing
+inferTypes tt (App left (Var x)) = inferTypes (Func (Var "") tt) left >>=
+  (\(t, ctx) -> case t of 
+          Func l r -> if (checkFuncTypeEqualityModVar r tt) then Just (r, Elem x l : ctx) else Nothing 
+          _ -> Nothing)
+inferTypes _ _ = Nothing -- nothing else allowed in Match term
+
+
+
+
+
+checkType :: [ContextElement] -> Term -> Maybe Term 
+checkType ctx (Var x) = find (\e -> elName e == x) ctx >>= return . ty
+checkType _ (Value _ t) = Just t 
+checkType ctx (Abs (x, t) tt) = checkType (Elem x t : ctx) tt >>= Just . Func t
+checkType ctx (App t1 t2) = case (checkType ctx t1, checkType ctx t2) of
   (Just (Func ct1 rt), Just ct2) -> if ct1 == ct2 then Just rt else Nothing 
   _ -> Nothing 
-checkType (Match m (x : xs)) = checkType m >>= \t1 -> foldl (\may -> \(l, r) -> 
-  case may of
-    Nothing -> Nothing 
-    Just acc ->
-      let ml = checkType l
-          mr = checkType r
-          in
-        case (ml, mr) of
-          (Just ctl, Just ctr) ->
-            if t1 == ctl && acc == ctr then Just acc
-            else Nothing
-          _ -> Nothing) (checkType (snd x)) xs 
-checkType (Match _ []) = Nothing 
-checkType Type0 = Just Type1 
-checkType Type1 = Just Type2
-checkType Type2 = Nothing
-checkType (Func t1 t2) = 
-  do  { ct1 <- checkType t1 
-      ; ct2 <- checkType t2 
+checkType ctx (Match m (x : xs)) =
+  (do
+    -- first get the expected left hand side type
+  ct <- checkType ctx m 
+    -- handle the first (term, term)
+  (it1, ictx1) <- inferTypes ct (eval $ fst x)
+    -- check that the infered type is correct, and return the right hand side type 
+  rt <- (if it1 == ct then checkType (ictx1 <> ctx) (snd x) else Nothing)
+    -- fold over the rest of the list
+  foldl (\macc -> \(l, r) -> 
+      case macc of
+        Nothing -> Nothing 
+        Just acc -> (do
+                -- get (infered type, infered context) from left hand side
+              (it, ictx) <- inferTypes ct (eval l)
+              ctr <- checkType (ictx <> ctx) r
+              (if it == ct && acc == ctr then Just acc
+                  else Nothing))) (Just rt) xs)
+checkType _ (Match _ []) = Nothing 
+checkType _ Type0 = Just Type1 
+checkType _ Type1 = Just Type2
+checkType _ Type2 = Nothing
+checkType ctx (Func t1 t2) = 
+  do  { ct1 <- checkType ctx t1 
+      ; ct2 <- checkType ctx t2 
       ; coverType ct1 ct2 }
 
 -- helper function for calculating Func type
