@@ -1,0 +1,17 @@
+type Nat
+value Zero : Nat 
+value Succ : {Nat} -> Nat 
+
+type Bool 
+value True : Bool
+value False : Bool
+
+
+def minusOne= \(n: Nat). match n with 
+  | Zero -> Zero 
+  | (Succ) m -> m 
+
+def twice = \(A: Type0). \(f: {A} -> A). \(a: A).
+  (f) (f) a 
+
+(((twice) Nat) minusOne) (Succ) (Succ) (Succ) Zero

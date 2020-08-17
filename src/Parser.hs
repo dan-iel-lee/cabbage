@@ -92,7 +92,11 @@ ident = Tok.identifier lexer
 -- Parse Values 
 funcTypeParser :: Parser Term
 funcTypeParser = do 
-  val <- braces exprParser
+  val <- braces (
+    try ( -- optional naming of function parameter
+      paramParser) <|> (do 
+        expr <- exprParser
+        return ("", expr)))
   reservedOp "->"
   rest <- exprParser
   return (Func val rest)
@@ -131,9 +135,9 @@ valueParserHelper = do
   return (name, ty)
 
 valueParser :: Parser Term 
-valueParser = do
+valueParser = try (do
   (name, ty) <- valueParserHelper
-  return (Value name ty)
+  return (Value name ty))
 
 valueDecParser :: Parser Identifier
 valueDecParser = do
@@ -152,8 +156,7 @@ namedDecParser = do
 
 -- Parse abstractions
 paramParser :: Parser (String, Term) 
-paramParser = do 
-  parens (do
+paramParser = parens (do
     name <- ident 
     reservedOp ":"
     ty <- exprParser
@@ -200,9 +203,9 @@ namedOrValParser = try (do
   return term)
 
 type0Parser :: Parser Term 
-type0Parser = do
-  try (symbol "Type0")
-  return Type0
+type0Parser = try(do
+  symbol "Type0"
+  return Type0)
 
 varParser :: Parser Term 
 varParser = try(do 
@@ -217,9 +220,9 @@ exprParser = choice [
     , absParser 
     , matchParser
     , namedOrValParser
-    , varParser
     , valueParser
-    , funcTypeParser]
+    , funcTypeParser
+    , varParser]
   
 
 -- Parse declarations
@@ -247,7 +250,7 @@ testParser s = runParser exprParser [] "" s
 
 
 parseFinalExp :: String -> Either ParseError Term
-parseFinalExp s = runParser finalParse [] "" s
+parseFinalExp s = fmap eval $ runParser finalParse [] "" s
 
 parseExpFromFile :: FilePath -> IO (Either ParseError Term)
 parseExpFromFile fpath = do 

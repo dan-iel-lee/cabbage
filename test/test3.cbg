@@ -19,4 +19,4 @@ def snd1 = \(A: Type0). \(B: Type0). \(p: ((Prod) A) B). match p with
 
 def Mknats = ((Mk) Nat) Nat
 
-(((snd1) Nat) Nat) ((Mknats) Zero) (Succ) Zero
+(((fst1) Nat) Nat) ((Mknats) Zero) (Succ) Zero
