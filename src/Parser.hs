@@ -10,14 +10,13 @@ import qualified Text.Parsec.Expr as Ex
 import Data.Functor.Identity (Identity)
 import DepTypes
 
-type Parser = Parsec String [Identifier]
+type Parser = Parsec String (Maybe ContextElement, [Identifier])
 
-data Identifier = Named { name :: String
-                        , term :: Term} deriving (Show)
 
 reservedNames = [
   "type",
   "value",
+  "rec",
   "def"] 
 reservedOps = [
   ":",
@@ -31,7 +30,7 @@ reservedOps = [
   "=",
   "."]
 
-langDef :: Tok.LanguageDef [Identifier]
+langDef :: Tok.LanguageDef (Maybe ContextElement, [Identifier])
 langDef  = Tok.LanguageDef
   {
     Tok.commentStart = ""
@@ -47,7 +46,7 @@ langDef  = Tok.LanguageDef
   , Tok.caseSensitive   = True
   }
 
-lexer :: Tok.TokenParser [Identifier]
+lexer :: Tok.TokenParser (Maybe ContextElement, [Identifier])
 lexer = Tok.makeTokenParser langDef
 
 parens :: Parser a -> Parser a
@@ -69,13 +68,14 @@ symbol :: String -> Parser String
 symbol s = Tok.symbol lexer s
 
 -- parse wrapper to check type after parsing a term 
+-- # TODO: make sure recursive type definition matches actual type
 checkTypeParse :: Parser Term -> Parser Term 
 checkTypeParse p = do
   pos <- getPosition
   e <- p
-  state <- getState
-  (case checkType [] e of 
-    Nothing -> error $ "Check type failed " <> (show pos) <> (show state)
+  (ce, arr) <- getState
+  (case checkType (fromMaybe [] (fmap (\e -> e : []) ce)) e of 
+    Nothing -> error $ "Check type failed " <> (show pos) <> (show arr)
     Just _ -> return e)
 
 {-|
@@ -151,6 +151,18 @@ namedDecParser = do
   reserved "="
   expr <- exprParser
   return (Named name expr)
+
+recursiveDefParser = do
+  reserved "rec"
+  name <- ident 
+  reserved ":"
+  ty <- exprParser 
+  modifyState (\(_, arr) -> (Just $ Elem name ty, arr)) -- add this context element to state for check type purposes
+  reserved "="
+  expr <- exprParser 
+  return (Named name expr)
+
+
 
 -- EXPRESSION PARSERS
 
@@ -230,8 +242,9 @@ decParse :: Parser Term
 decParse = do
   dec <- valueDecParser
     <|> namedDecParser
+    <|> recursiveDefParser
+  modifyState (\(ce, arr) -> (ce, (Named (name dec) (eval [] $ term dec) : arr))) -- evaluating
   checkTypeParse (return (term dec)) -- check type before... 
-  modifyState ((:) (Named (name dec) (eval $ term dec))) -- evaluating
   return (term dec)
 
 allDecParse :: Parser ()
@@ -243,14 +256,16 @@ finalParse :: Parser Term
 finalParse = do
   allDecParse 
   many (char '\n')
-  checkTypeParse exprParser
+  expr <- checkTypeParse exprParser
+  (_, vars) <- getState
+  return $ eval vars expr
 
 
-testParser s = runParser exprParser [] "" s
+testParser s = runParser exprParser (Nothing, []) "" s
 
 
 parseFinalExp :: String -> Either ParseError Term
-parseFinalExp s = fmap eval $ runParser finalParse [] "" s
+parseFinalExp s = runParser finalParse (Nothing, []) "" s
 
 parseExpFromFile :: FilePath -> IO (Either ParseError Term)
 parseExpFromFile fpath = do 
@@ -272,7 +287,7 @@ parse1 = do
   reservedOp "->"
   varParser
 
-runParse1 s = runParser parse1 [] "" s
+runParse1 s = runParser parse1 (Nothing, []) "" s
 
 -- # TODO check no duplicates
 
@@ -300,5 +315,5 @@ contents p = do
 
 
 -- helper to find a term named such
-findNamed :: String -> [Identifier] -> Maybe Term 
-findNamed s arr = listToMaybe $ mapMaybe (\(Named name t) -> if name == s then Just t else Nothing) arr
+findNamed :: String -> (Maybe ContextElement, [Identifier]) -> Maybe Term 
+findNamed s (_, arr) = listToMaybe $ mapMaybe (\(Named name t) -> if name == s then Just t else Nothing) arr

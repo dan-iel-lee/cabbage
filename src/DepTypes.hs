@@ -4,6 +4,7 @@ module DepTypes where
 
 import Data.List
 import Helpers
+import Data.Maybe
 
 data Term
   = Var String
@@ -11,6 +12,7 @@ data Term
   | Abs (String, Term) Term
   | App Term Term
   | Match Term [(Term, Term)]
+
   | Func (String, Term) Term
   | Type0
   | Type1
@@ -35,6 +37,10 @@ data ContextElement = Elem
   }
   deriving (Show)
 
+-- used by Parser as well
+data Identifier = Named { name :: String
+                        , term :: Term} deriving (Show)
+
 -- subs T s tt = T[s/tt]
 subs :: Term -> String -> Term -> Term
 subs (Var x) s tt = case x == s of
@@ -50,27 +56,28 @@ subs (Match m arr) s tt = Match (subs m s tt) $ map (\(t1, t2) -> (t1, subs t2 s
 subs val _ _ = val
 
 -- perform one step
-step :: Term -> Term
-step (App t1 t2) =
-  if not $ isNormal t1
-    then App (step t1) t2 -- if t1 can step, step it
+step :: [Identifier] -> Term -> Term
+step vars (Var s) = fromMaybe (Var s) $ fmap term $ find ((==) s . name) vars
+step vars (App t1 t2) =
+  if not $ isNormal vars t1
+    then App (step vars t1) t2 -- if t1 can step, step it
     else
-      if not $ isNormal t2
-        then App t1 (step t2) -- if t2 can step, step it
+      if not $ isNormal vars t2
+        then App t1 (step vars t2) -- if t2 can step, step it
         else case t1 of
           Abs (var, _) x -> subs x var t2 -- if t1 is an abstraction, substitute
           _ -> (App t1 t2)
-step (Match m arr) =
-  if not $ isNormal m
-    then Match (step m) arr
-    else stepMatch m arr
-step other = other
+step vars (Match m arr) =
+  if not $ isNormal vars m
+    then Match (step vars m) arr
+    else stepMatch vars m arr
+step _ other = other
 
 -- helper for stepping on a Match
-stepMatch :: Term -> [(Term, Term)] -> Term
-stepMatch tt arr = case find (not . isNormal . fst) arr of
+stepMatch :: [Identifier] -> Term -> [(Term, Term)] -> Term
+stepMatch vars tt arr = case find (not . isNormal vars . fst) arr of
   Just (l, r) ->
-    let newArr = map (\(x, y) -> if x == l then (step l, r) else (x, y)) arr -- if there is a non-normal term, then step it
+    let newArr = map (\(x, y) -> if x == l then (step vars l, r) else (x, y)) arr -- if there is a non-normal term, then step it
      in Match tt newArr
   Nothing -> case tt of
     Value s t -> case fmap snd $ find (\(x, _) -> x == (Value s t)) arr of
@@ -105,16 +112,16 @@ matchApp Type2 (Type2, tt) = Just tt
 matchApp _ _ = Nothing -- otherwise match fails
 
 -- eval = step until no more stepping
-eval :: Term -> Term
-eval t =
-  let st = step t
+eval :: [Identifier] -> Term -> Term
+eval vars t =
+  let st = step vars t
    in if st == t
         then t
-        else eval st
+        else eval vars st
 
 -- check if term can still step
-isNormal :: Term -> Bool
-isNormal t = step t == t
+isNormal :: [Identifier] -> Term -> Bool
+isNormal vars t = step vars t == t
 
 -- helper for inferTypes
 checkFuncTypeEqualityModVar :: Term -> Term -> Bool
@@ -159,7 +166,7 @@ checkType ctx (Match m (x : xs)) =
       -- first get the expected left hand side type
       ct <- checkType ctx m
       -- handle the first (term, term)
-      (it1, ictx1) <- inferTypes ct (eval $ fst x) -- eval to ensure it's in normal form
+      (it1, ictx1) <- inferTypes ct (eval [] $ fst x) -- eval to ensure it's in normal form
       -- check that the infered type is correct, and return the right hand side type
       rt <- (if it1 ?= ct then checkType (ictx1 <> ctx) (snd x) else Nothing)
       -- fold over the rest of the list
@@ -170,7 +177,7 @@ checkType ctx (Match m (x : xs)) =
               Just acc ->
                 ( do
                     -- get (infered type, infered context) from left hand side
-                    (it, ictx) <- inferTypes ct (eval l)
+                    (it, ictx) <- inferTypes ct (eval [] l)
                     ctr <- checkType (ictx <> ctx) r
                     (if it ?= ct && acc ?= ctr
                         then Just acc

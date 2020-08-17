@@ -1,0 +1,20 @@
+type Nat
+value Zero : Nat 
+value Succ : {Nat} -> Nat 
+
+type Bool 
+value True : Bool
+value False : Bool
+
+
+def one = (Succ) Zero
+def two = (Succ) one 
+def three = (Succ) two
+
+rec lessThan : {Nat} -> {Nat} -> Bool = \(x: Nat). \(y: Nat). match x with 
+  | Zero -> True 
+  | (Succ) n -> match y with
+    | Zero -> False 
+    | (Succ) m -> ((lessThan) n) m
+
+((lessThan) three) two
