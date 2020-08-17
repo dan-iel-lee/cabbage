@@ -66,18 +66,6 @@ step (Match m arr) =
     else stepMatch m arr
 step other = other
 
--- eval = step until no more stepping
-eval :: Term -> Term
-eval t =
-  let st = step t
-   in if st == t
-        then t
-        else eval st
-
--- check if term can still step
-isNormal :: Term -> Bool
-isNormal t = step t == t
-
 -- helper for stepping on a Match
 stepMatch :: Term -> [(Term, Term)] -> Term
 stepMatch tt arr = case find (not . isNormal . fst) arr of
@@ -116,6 +104,18 @@ matchApp Type1 (Type1, tt) = Just tt
 matchApp Type2 (Type2, tt) = Just tt
 matchApp _ _ = Nothing -- otherwise match fails
 
+-- eval = step until no more stepping
+eval :: Term -> Term
+eval t =
+  let st = step t
+   in if st == t
+        then t
+        else eval st
+
+-- check if term can still step
+isNormal :: Term -> Bool
+isNormal t = step t == t
+
 -- helper for inferTypes
 checkFuncTypeEqualityModVar :: Term -> Term -> Bool
 checkFuncTypeEqualityModVar (Func (_, l1) r1) (Func (_, l2) r2) =
@@ -138,12 +138,12 @@ inferTypes tt (App left (Var x)) =
         )
 inferTypes _ _ = Nothing -- nothing else allowed in Match term
 
-
-eqModFName (Func (_, a1) b1) (Func (_, a2) b2) = a1 == a2 && b1 == b2
-eqModFName t1 t2 = t1 == t2
-
+-- Custom equals for terms, since we don't really care about parameter name
+termEq :: Term -> Term -> Bool
+termEq (Func (_, a1) b1) (Func (_, a2) b2) = a1 == a2 && b1 == b2
+termEq t1 t2 = t1 == t2
 infix 4 ?=
-(?=) = eqModFName
+(?=) = termEq
 
 checkType :: [ContextElement] -> Term -> Maybe Term
 checkType ctx (Var x) = find (\e -> elName e == x) ctx >>= return . ty
@@ -159,7 +159,7 @@ checkType ctx (Match m (x : xs)) =
       -- first get the expected left hand side type
       ct <- checkType ctx m
       -- handle the first (term, term)
-      (it1, ictx1) <- inferTypes ct (eval $ fst x)
+      (it1, ictx1) <- inferTypes ct (eval $ fst x) -- eval to ensure it's in normal form
       -- check that the infered type is correct, and return the right hand side type
       rt <- (if it1 ?= ct then checkType (ictx1 <> ctx) (snd x) else Nothing)
       -- fold over the rest of the list
