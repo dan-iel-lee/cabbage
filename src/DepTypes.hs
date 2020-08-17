@@ -192,10 +192,10 @@ checkType _ (Match _ []) = Nothing
 checkType _ Type0 = Just Type1
 checkType _ Type1 = Just Type2
 checkType _ Type2 = Nothing
-checkType ctx (Func (_, t1) t2) =
+checkType ctx (Func (p, t1) t2) =
   do
     ct1 <- checkType ctx t1
-    ct2 <- checkType ctx t2
+    ct2 <- checkType (Elem p t1 : ctx) t2 -- add parameter to context
     coverType ct1 ct2
 
 -- helper function for calculating Func type

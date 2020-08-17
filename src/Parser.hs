@@ -71,8 +71,8 @@ symbol s = Tok.symbol lexer s
 -- # TODO: make sure recursive type definition matches actual type
 checkTypeParse :: Parser Term -> Parser Term 
 checkTypeParse p = do
-  pos <- getPosition
   e <- p
+  pos <- getPosition
   (ce, arr) <- getState
   (case checkType (fromMaybe [] (fmap (\e -> e : []) ce)) e of 
     Nothing -> error $ "Check type failed " <> (show pos) <> (show arr)

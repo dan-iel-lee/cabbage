@@ -1,0 +1,27 @@
+type Nat
+value Zero : Nat 
+value Succ : {Nat} -> Nat 
+
+
+
+def one = (Succ) Zero
+def two = (Succ) one 
+def three = (Succ) two
+
+
+type List : {Type0} -> Type0 
+value Nil : {(A: Type0)} -> (List) A
+value Cons : {(A: Type0)} -> {A} -> {(List) A} -> (List) A
+
+def ListN = (List) Nat
+def NilN = (Nil) Nat 
+def ConsN = (Cons) Nat
+
+rec nthEl : {(A: Type0)} -> {(List) A} -> {Nat} -> A =
+  \(A: Type0). \(l: (List) A). \(n: Nat). match n with
+    | Zero -> match l with
+      | ((Cons) a) tail -> a 
+    | Succ m -> match l with 
+      | ((Cons) a) tail -> (((nthEl) A) tail) m
+
+(((nthEl) Nat) ((ConsN) Zero) NilN) Zero
