@@ -7,3 +7,7 @@ firstJust _ [] = Nothing
 firstJust f (x:xs) = case f x of
   Just y -> Just y
   Nothing -> firstJust f xs
+
+consMaybe :: Maybe a -> [a] -> [a]
+consMaybe Nothing = id
+consMaybe (Just x) = (:) x

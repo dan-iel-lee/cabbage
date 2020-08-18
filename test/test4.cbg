@@ -1,10 +1,10 @@
 type Nat
-value Zero : Nat 
-value Succ : {Nat} -> Nat 
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
 
 type Bool 
-value True : Bool
-value False : Bool
+const True : Bool
+const False : Bool
 
 
 def minusOne= \(n: Nat). match n with 

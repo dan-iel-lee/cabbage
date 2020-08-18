@@ -17,11 +17,8 @@ def ListN = (List) Nat
 def NilN = (Nil) Nat 
 def ConsN = (Cons) Nat
 
-rec nthEl : {(A: Type0)} -> {(List) A} -> {Nat} -> A =
-  \(A: Type0). \(l: (List) A). \(n: Nat). match n with
-    | Zero -> match l with
-      | ((Cons) a) tail -> a; 
-    | (Succ) m -> match l with 
-      | ((Cons) a) tail -> (((nthEl) A) tail) m;;
+def head =
+  \(A: Type0). \(l: (List) A). match l with
+    | (Cons) a -> a;
 
-(((nthEl) Nat) ((ConsN) Zero) NilN) Zero
+((head) Nat) ((ConsN) Zero) NilN

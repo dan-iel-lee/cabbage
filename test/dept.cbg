@@ -1,0 +1,29 @@
+type Nat
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
+
+type PowerSource
+const Pedal : PowerSource 
+const Petrol : PowerSource 
+
+type Vehicle : {PowerSource} -> Type0
+const Bicycle : (Vehicle) Pedal 
+const Car : {Nat} -> (Vehicle) Petrol 
+const Bus : {Nat} -> (Vehicle) Petrol 
+
+def one = (Succ) Zero 
+def two = (Succ) one
+def three = (Succ) two
+
+def refuel = \(v: (Vehicle) Petrol). match v with
+  | (Car) fuel -> (Car) two
+  | (Bus) fuel -> (Bus) three;
+
+def boolToVeh = \(b: Bool). match b with 
+  | True -> (Vehicle) Pedal 
+  | False -> (Vehicle) Petrol
+
+def weird = \(x: (boolToVeh) True). match x with 
+  | 
+
+(refuel) (Car) Zero

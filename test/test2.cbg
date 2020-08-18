@@ -1,14 +1,23 @@
 type Nat
-value Zero : Nat 
-value Succ : {Nat} -> Nat 
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
 
 type Bool 
-value True : Bool
-value False : Bool
+const True : Bool
+const False : Bool
 
 type Prod : {Type0} -> {Type0} -> Type0
-def Mk = \(A: Type0). \(B: Type0). value Mkprod : {A} -> {B} -> ((Prod) A) B
+def Mk = \(A: Type0). \(B: Type0). const Mkprod : {A} -> {B} -> ((Prod) A) B
 
+def boolToInt = \(b: Bool). match b with 
+  | True -> Zero 
+  | False -> (Succ) Zero 
+
+type DependentType : {Nat} -> Type0
+const DT : {(b: Bool)} -> {(DependentType) (boolToInt) b}
+
+def testtt = \(dt: (DependentType) n). match dt with 
+  | (DT) b -> b
 
 def Mknats = ((Mk) Nat) Nat
 def fst = \(p: ((Prod) Nat) Nat). match p with

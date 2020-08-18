@@ -1,21 +1,21 @@
 type Nat
-value Zero : Nat 
-value Succ : {Nat} -> Nat 
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
 
 type Bool 
-value True : Bool
-value False : Bool
+const True : Bool
+const False : Bool
 
 type Prod : {Type0} -> {Type0} -> Type0
-def Mk = \(A: Type0). \(B: Type0). value Mkprod : {A} -> {B} -> ((Prod) A) B
+const Mk : {(A: Type0)} -> {(B: Type0)} -> {A} -> {B} -> ((Prod) A) B
 
 
 def fst1 = \(A: Type0). \(B: Type0). \(p: ((Prod) A) B). match p with
-  | ((((Mk) A) B) a) b -> a
+  | ((((Mk) A) B) a) b -> a;
 
 
 def snd1 = \(A: Type0). \(B: Type0). \(p: ((Prod) A) B). match p with
-  | ((((Mk) A) B) a) b -> b
+  | ((((Mk) A) B) a) b -> b;
 
 def Mknats = ((Mk) Nat) Nat
 

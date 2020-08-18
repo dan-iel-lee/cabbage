@@ -1,10 +1,10 @@
 type Nat
-value Zero : Nat 
-value Succ : {Nat} -> Nat 
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
 
 type Bool 
-value True : Bool
-value False : Bool
+const True : Bool
+const False : Bool
 
 
 def one = (Succ) Zero
@@ -13,10 +13,10 @@ def three = (Succ) two
 
 def minusOne= \(n: Nat). match n with 
   | Zero -> Zero 
-  | (Succ) m -> m 
+  | (Succ) m -> m; 
 
 def minusOrPlusOne = \(b: Bool). \(n: Nat). match b with
   | True -> (Succ) n 
-  | False -> (minusOne) n
+  | False -> (minusOne) n;
 
 ((minusOrPlusOne) False) three

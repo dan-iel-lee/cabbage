@@ -12,7 +12,7 @@ data Type =
 
 data Term = 
     Var String Type
-  | Value String Type
+  | Const String Type
   | Abs String String Term Type
   | App Term Term
   | TypeTerm Type
@@ -28,10 +28,10 @@ natural :: Type
 natural = CustType "Nat"
 
 zero :: Term 
-zero = Value "zero" natural
+zero = Const "zero" natural
 
 successor :: Term 
-successor = Value "succ" (Func natural natural)
+successor = Const "succ" (Func natural natural)
 
 plus1 :: Term 
 plus1 = Abs "plus" "n" (App successor (App successor (Var "n" natural))) (Func natural natural)
@@ -66,7 +66,7 @@ stepType (Dep term) = Dep (step term)
 
 checktype :: Term -> (Maybe Type)
 checktype (Var _ ty) = Just ty
-checktype (Value _ ty) = Just ty 
+checktype (Const _ ty) = Just ty 
 checktype (Abs _ _ _ ty) = Just ty -- TODO: type check functions
 checktype (App t1 t2) = case (checktype t1, checktype t2) of 
   (Just (Func ty1 ty2), Just ty3) -> if ty1 == ty3 then Just ty2 else Nothing
@@ -77,8 +77,8 @@ checktype (TypeTerm _) = Just Univ
 
 -- Playing with dependent types
 boolean = CustType "Bool"
-true = Value "True" boolean
-false = Value "False" boolean
+true = Const "True" boolean
+false = Const "False" boolean
 
 identity = Abs "identity" "typevar" (Abs "" "x" (Var "x" (Dep (Var "typevar" Univ))) (Func (Dep $ Var "typevar" Univ) (Dep $ Var "typevar" Univ))) (Func Univ (Func (Dep $ Var "typevar" Univ) (Dep $ Var "typevar" Univ)))
 

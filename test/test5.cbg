@@ -1,20 +1,24 @@
 type Nat
-value Zero : Nat 
-value Succ : {Nat} -> Nat 
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
 
 type Bool 
-value True : Bool
-value False : Bool
+const True : Bool
+const False : Bool
 
+
+type Prod : {Type0} -> {Type0} -> Type0
+const MkProd : {(A: Type0)} -> {(B: Type0)} -> {A} -> {B} -> ((Prod) A) B
 
 def one = (Succ) Zero
 def two = (Succ) one 
 def three = (Succ) two
 
-rec lessThan : {Nat} -> {Nat} -> Bool = \(x: Nat). \(y: Nat). match x with 
-  | Zero -> True 
-  | (Succ) n -> match y with
-    | Zero -> False 
-    | (Succ) m -> ((lessThan) n) m
+def NatProd = ((MkProd) Nat) Nat
+
+rec lessThan : {Nat} -> {Nat} -> Bool = \(x: Nat). \(y: Nat). match ((NatProd) x) y with
+  | ((NatProd) Zero) b -> True 
+  | ((NatProd) a) Zero -> False 
+  | ((NatProd) (Succ) n) (Succ) m -> ((lessThan) n) m;
 
 ((lessThan) three) two
