@@ -20,6 +20,7 @@ def two = (Succ) one
 def three = (Succ) two
 
 def refuel = \(v: (Vehicle) Petrol). match v with
+  // | Bicycle -> (Car) two  - not allowed because Bicycle is not a Petrol vehicle
   | (Car) fuel -> (Car) two
   | (Bus) fuel -> (Bus) three;
 

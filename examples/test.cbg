@@ -1,0 +1,16 @@
+type Nat
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
+
+
+def one = (Succ) Zero
+def two = (Succ) one 
+def three = (Succ) two
+
+
+def test = \(n: Nat). match n with 
+  | Zero -> Zero
+  | (Succ) Zero -> one
+  | (Succ) m -> two;
+
+(test) three

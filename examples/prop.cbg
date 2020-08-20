@@ -24,8 +24,10 @@ def pred= \(n: Nat). match n with
   | Zero -> Zero 
   | (Succ) m -> m; 
 
-type NatLT : {Nat} -> {Bool} -> Type0
+type NatLT : {Nat} -> {Nat} -> Type0
 const Eq : {(x: Nat)} -> ((NatLT) x) x
 const Sub : {(x: Nat)} -> {(y: Nat)} -> {((NatLT) x) y} -> ((NatLT) (pred) x) y
 
-(((Sub) two) three) (Eq) three
+def yay = (((Sub) three) three) (Eq) three
+
+yay

@@ -14,7 +14,8 @@ main = do
     Left error -> putStrLn $ show error 
     Right (terms, ctx, e) -> 
       do
-        putStrLn $ show ctx
+        -- putStrLn $ show ctx
         case evalFinal terms ctx e of 
-          Left error -> putStrLn $ show error 
-          Right final -> putStrLn $ prettyPrint final 
+          Left error -> putStrLn $ error 
+          Right (term, typ) -> putStrLn $ "Evaluated term: \n  " <> prettyPrint term <> " \n"
+                                       <> "With type: \n  " <> prettyPrint typ

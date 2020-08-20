@@ -17,6 +17,8 @@ def ListN = (List) Nat
 def NilN = (Nil) Nat 
 def ConsN = (Cons) Nat
 
+// need signature so that type checker can handle recursive call
+// returns the nth element of a list 
 sig nthEl : {(A: Type0)} -> {(List) A} -> {Nat} -> A
 def nthEl =
   \(A: Type0). \(l: (List) A). \(n: Nat). match n with
@@ -27,6 +29,7 @@ def nthEl =
 
 def four = (Succ) three
 
+// creates a list of n elements with numbers n to 1
 sig nNats : {Nat} -> (List) Nat
 def nNats = \(n: Nat). match n with 
   | Zero -> ((ConsN) Zero) NilN 

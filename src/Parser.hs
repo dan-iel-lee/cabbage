@@ -10,6 +10,7 @@ import qualified Text.Parsec.Expr as Ex
 import Data.Functor.Identity (Identity)
 import DepTypes
 import Helpers
+import Lib
 
 type Parser = Parsec String ([ContextElement])
 
@@ -35,9 +36,9 @@ reservedOps = [
 langDef :: Tok.LanguageDef ([ContextElement])
 langDef  = Tok.LanguageDef
   {
-    Tok.commentStart = ""
-  , Tok.commentEnd = ""
-  , Tok.commentLine = ""
+    Tok.commentStart = "/*"
+  , Tok.commentEnd = "*/"
+  , Tok.commentLine = "//"
   , Tok.nestedComments = False 
   , Tok.identStart = letter 
   , Tok.identLetter = alphaNum 

@@ -7,11 +7,11 @@ const True : Bool
 const False : Bool
 
 
-def minusOne= \(n: Nat). match n with 
+def pred= \(n: Nat). match n with 
   | Zero -> Zero 
   | (Succ) m -> m; 
 
 def twice = \(A: Type0). \(f: {A} -> A). \(a: A).
   (f) (f) a 
 
-(((twice) Nat) minusOne) (Succ) (Succ) (Succ) Zero
+(((twice) Nat) pred) (Succ) (Succ) (Succ) Zero
