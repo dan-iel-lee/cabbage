@@ -2,6 +2,10 @@ type Nat
 const Zero : Nat 
 const Succ : {Nat} -> Nat 
 
+type Bool 
+const True : Bool 
+const False : Bool
+
 type PowerSource
 const Pedal : PowerSource 
 const Petrol : PowerSource 
@@ -21,9 +25,9 @@ def refuel = \(v: (Vehicle) Petrol). match v with
 
 def boolToVeh = \(b: Bool). match b with 
   | True -> (Vehicle) Pedal 
-  | False -> (Vehicle) Petrol
+  | False -> (Vehicle) Petrol;
 
-def weird = \(x: (boolToVeh) True). match x with 
-  | 
+def weird = \(x: (boolToVeh) False). match x with 
+  | (Car) n -> True;
 
 (refuel) (Car) Zero

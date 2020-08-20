@@ -1,0 +1,31 @@
+type Nat
+const Zero : Nat 
+const Succ : {Nat} -> Nat 
+
+type Bool 
+const True : Bool
+const False : Bool
+
+
+def one = (Succ) Zero
+def two = (Succ) one 
+def three = (Succ) two
+
+def weird= \(x: Nat). \(y: Nat). True
+
+sig lessThan : {Nat} -> {Nat} -> Bool 
+def lessThan= \(x: Nat). \(y: Nat). match x with 
+  | Zero -> True 
+  | (Succ) n -> match y with
+    | Zero -> False 
+    | (Succ) m -> ((lessThan) n) m;;
+
+def pred= \(n: Nat). match n with 
+  | Zero -> Zero 
+  | (Succ) m -> m; 
+
+type NatLT : {Nat} -> {Bool} -> Type0
+const Eq : {(x: Nat)} -> ((NatLT) x) x
+const Sub : {(x: Nat)} -> {(y: Nat)} -> {((NatLT) x) y} -> ((NatLT) (pred) x) y
+
+(((Sub) two) three) (Eq) three

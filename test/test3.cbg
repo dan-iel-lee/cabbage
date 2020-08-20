@@ -13,7 +13,6 @@ const Mk : {(A: Type0)} -> {(B: Type0)} -> {A} -> {B} -> ((Prod) A) B
 def fst1 = \(A: Type0). \(B: Type0). \(p: ((Prod) A) B). match p with
   | ((((Mk) A) B) a) b -> a;
 
-
 def snd1 = \(A: Type0). \(B: Type0). \(p: ((Prod) A) B). match p with
   | ((((Mk) A) B) a) b -> b;
 

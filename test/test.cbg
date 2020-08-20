@@ -11,12 +11,14 @@ def one = (Succ) Zero
 def two = (Succ) one 
 def three = (Succ) two
 
-def minusOne= \(n: Nat). match n with 
+def pred= \(n: Nat). match n with 
   | Zero -> Zero 
   | (Succ) m -> m; 
 
 def minusOrPlusOne = \(b: Bool). \(n: Nat). match b with
   | True -> (Succ) n 
-  | False -> (minusOne) n;
+  | False -> (pred) n;
+
+def four = (Succ) three
 
 ((minusOrPlusOne) False) three

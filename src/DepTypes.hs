@@ -3,21 +3,20 @@
 module DepTypes where
 
 import Data.List
-import Helpers
 import Data.Maybe
+import Helpers
 
 data Term
   = Var String
   | Const String Term
   | Abs (String, Term) Term
   | App Term Term
-  -- Match consists of a term to match, and a list of (matchee, result) pairs
-  | Match Term [(Term, Term)]
-
-  -- (String: Term) -> (Term)
-  | Func (String, Term) Term
-  -- Universes
-  | Type0
+  | -- Match consists of a term to match, and a list of (matchee, result) pairs
+    Match Term [(Term, Term)]
+  | -- (String: Term) -> (Term)
+    Func (String, Term) Term
+  | -- Universes
+    Type0
   | Type1
   | Type2
   deriving (Eq, Show)
@@ -27,68 +26,59 @@ instance Show Term where
   show (Var s) = s
   show (Const s t) = s <> ": " <> show t
   show (Abs (s, tt) t) = "\\(" <> s <> ": " <> show tt <> "). " <> show t
-  show (App t1 t2) = "(" <> show t1 <> ") " <> show t2 
+  show (App t1 t2) = "(" <> show t1 <> ") " <> show t2
   show (Match m ts) = "match " <> show m <> " where\n" <> foldl (\acc -> \t -> acc <> "| " <> t <> "\n") "" (map show ts)
 
-  show (Func t1 t2) = show t1 <> " -> " <> show t2 
+  show (Func t1 t2) = show t1 <> " -> " <> show t2
   show Type0 = "Type0"
   show Type1 = "Type1"
   show Type2 = "Type2"
 -}
-{-
-instance Eq Term where
-  (==) (Var a1) (Var a2) = a1 == a2
-  (==) (Const a1 b1) (Const a2 b2) = a1 == a2 && b1 == b2
-  (==) (Abs a1 b1) (Abs a2 b2) = a1 == a2 && b1 == b2
-  (==) (Match a1 b1) (Match a2 b2) = a1 == a2 && b1 == b2
-  (==) Type0 Type0 = True
-  (==) Type1 Type1 = True
-  (==) Type2 Type2 = True
-  -- custom equals for Func, name doesn't matter 
-  (==) (Func (_, a1) b1) (Func (_, a2) b2) = a1 == a2 && b1 == b2
-  (==) _ _ = False -}
-
 
 data ContextElement = Elem
   { elName :: String,
-    ty :: Term }
+    ty :: Term
+  }
   deriving (Show)
 
 -- Named terms (a list of which is like a Heap)
-data Identifier = Named { name :: String
-                        , term :: Term} deriving (Show)
+data NamedTerm = Named
+  { name :: String,
+    term :: Term
+  }
+  deriving (Show)
 
--- subs T s tt = T[s/tt]
+-- subs T s e = T[s/e]
 subs :: Term -> String -> Term -> Term
 -- Variable: substitute if variable name is equal to s
-subs (Var x) s tt = case x == s of
-  True -> tt
+subs (Var x) s e = case x == s of
+  True -> e
   False -> Var x
 -- Const: only substitute in the type
-subs (Const x t) s tt = Const x (subs t s tt)
+subs (Const x t) s e = Const x (subs t s e)
 -- Application: substitute on each side
-subs (App f x) s tt = App (subs f s tt) (subs x s tt)
+subs (App f x) s e = App (subs f s e) (subs x s e)
 -- Abstraction: always substitute in the type; substitute in the body IF unbound (var != s)
-subs (Abs (var, t) x) s tt = case var == s of
-  True -> Abs (var, (subs t s tt)) x
-  False -> Abs (var, (subs t s tt)) (subs x s tt)
-subs (Func (p, l) r) s tt = Func (p, subs l s tt) (if p == s then r else subs r s tt)
-subs (Match m arr) s tt = Match (subs m s tt) $ map (\(t1, t2) -> (t1, subs t2 s tt)) arr
+subs (Abs (var, t) x) s e = case var == s of
+  True -> Abs (var, (subs t s e)) x
+  False -> Abs (var, (subs t s e)) (subs x s e)
+subs (Func (p, l) r) s e = Func (p, subs l s e) (if p == s then r else subs r s e)
+subs (Match m arr) s e = Match (subs m s e) $ map (\(t1, t2) -> (t1, subs t2 s e)) arr
 subs univ _ _ = univ
 
 -- perform one step
-step :: [Identifier] -> Term -> Term
+step :: [NamedTerm] -> Term -> Term
 -- Var: replace with term on the HEAP!
 step vars (Var s) = fromMaybe (Var s) $ fmap term $ find ((==) s . name) vars
-step vars (App t1 t2) =
-  if not $ isNormal vars t1
-    then App (step vars t1) t2 -- if t1 can step, step it
+step vars (App e1 e2) =
+  if not $ isNormal vars e1
+    then App (step vars e1) e2 -- if t1 can step, step it
     else
-      if not $ isNormal vars t2
-        then App t1 (step vars t2) -- if t2 can step, step it
-        else case t1 of
-          Abs (var, _) x -> subs x var t2 -- otherwise, if t1 is an abstraction, substitute
-          _ -> (App t1 t2) -- and finally, leave it be if nothing steps
+      if not $ isNormal vars e2
+        then App e1 (step vars e2) -- if t2 can step, step it
+        else case e1 of
+          Abs (var, _) x -> subs x var e2 -- otherwise, if t1 is an abstraction, substitute
+          _ -> (App e1 e2) -- and finally, leave it be if nothing steps
 step vars (Match m arr) =
   if not $ isNormal vars m
     then Match (step vars m) arr
@@ -96,45 +86,31 @@ step vars (Match m arr) =
 step _ other = other
 
 -- helper for stepping on a Match
-stepMatch :: [Identifier] -> Term -> [(Term, Term)] -> Term
-stepMatch vars tt arr = case find (not . isNormal vars . fst) arr of
+stepMatch :: [NamedTerm] -> Term -> [(Term, Term)] -> Term
+stepMatch vars m arr = case find (not . isNormal vars . fst) arr of
   Just (l, r) ->
     let newArr = map (\(x, y) -> if x == l then (step vars l, r) else (x, y)) arr -- if there is a non-normal term, then step it
-     in Match tt newArr
-  Nothing -> case tt of
-    Const s t -> case fmap snd $ find (\(x, _) -> x == (Const s t)) arr of
-      Just j -> j -- find matching value
-      Nothing -> Match (Const s t) arr -- doesn't step
-    App t1 t2 -> case firstJust (matchApp (App t1 t2)) arr of
-      Just j -> j -- return matching value
-      Nothing -> Match (App t1 t2) arr -- doesn't step
-    _ -> Match tt arr -- doesn't step
+     in Match m newArr
+  Nothing -> fromMaybe (Match m arr) $ firstJust (matchApp m) arr -- done normalizing, now do the matching
 
 -- apply match to one term
 matchApp :: Term -> (Term, Term) -> Maybe Term
-matchApp t (Var s, tt) = Just $ subs tt s t -- if down to a variable, then just substitute
-matchApp (Const s1 t1) (Const s2 t2, tt) =
+matchApp e (Var s, right) = Just $ subs right s e -- if down to a variable, then just substitute
+matchApp (Const s1 _) (Const s2 _, right) =
+  -- if down to constants, then just check if they're equal
   if s1 /= s2
     then Nothing
-    else matchApp t1 (t2, tt)
-matchApp (App l1 r1) (App l2 r2, tt) =
+    else Just right -- matchApp t1 (t2, tt)
+matchApp (App l1 r1) (App l2 r2, right) =
   -- if it's an Application recursively check we're applying the same things
   do
-    ml <- matchApp l1 (l2, tt) -- match first term
+    ml <- matchApp l1 (l2, right) -- match first term
     matchApp r1 (r2, ml) -- then match second term
-    -- types
-matchApp (Func (_, l1) r1) (Func (_, l2) r2, tt) =
-  -- Func type similar to Application
-  do
-    ml <- matchApp l1 (l2, tt) -- match first term
-    matchApp r1 (r2, ml) -- then match second term
-matchApp Type0 (Type0, tt) = Just tt
-matchApp Type1 (Type1, tt) = Just tt
-matchApp Type2 (Type2, tt) = Just tt
-matchApp _ _ = Nothing -- otherwise match fails
+    -- only allow Applications of constants; anything else fails
+matchApp _ _ = Nothing
 
 -- eval = step until no more stepping
-eval :: [Identifier] -> Term -> Term
+eval :: [NamedTerm] -> Term -> Term
 eval vars t =
   -- start off by replacing
   let st = step vars t
@@ -144,20 +120,19 @@ eval vars t =
 
 -- evaluates list of named terms in order, then evaluates final expression
 -- IMPORTANT: only allows terms to reference terms defined before it
-evalAll :: [Identifier] -> Term -> Term 
+evalAll :: [NamedTerm] -> Term -> Term
 evalAll terms = eval $ evalAllHelper (reverse terms)
 
 -- helper which evaluates from first list, and when done, pushes to the second
 -- takes the original list in REVERSE order
-evalAllHelper :: [Identifier] -> [Identifier]
+evalAllHelper :: [NamedTerm] -> [NamedTerm]
 evalAllHelper [] = []
-evalAllHelper (Named n x : xs) = 
-  let done = evalAllHelper xs in 
-    (Named n (eval done x)) : done
-
+evalAllHelper (Named n x : xs) =
+  let done = evalAllHelper xs
+   in (Named n (eval done x)) : done
 
 -- check if term can still step
-isNormal :: [Identifier] -> Term -> Bool
+isNormal :: [NamedTerm] -> Term -> Bool
 isNormal vars t = step vars t == t
 
 -- helper for inferTypes
@@ -169,7 +144,7 @@ checkFuncTypeEqualityModVar (Func (_, l1) r1) (Func (_, l2) r2) =
       (_, _) -> l1 == l2
   )
     && checkFuncTypeEqualityModVar r1 r2
-checkFuncTypeEqualityModVar t1 t2 = t1 == t2
+checkFuncTypeEqualityModVar t1 t2 = t1 ?= t2
 
 -- infer types in a match term
 inferTypes :: Term -> Term -> Maybe (Term, [ContextElement])
@@ -183,29 +158,37 @@ inferTypes tt (App left (Var x)) =
 inferTypes _ _ = Nothing -- nothing else allowed in Match term
 
 -- Custom equals for terms, since we don't really care about parameter name
-termEq :: Term -> Term -> Bool
+termEq :: Term -> Term -> Bool -- # TODO: do we need to eval beforer checking equality?
 termEq (Func (_, a1) b1) (Func (_, a2) b2) = a1 == a2 && b1 `termEq` b2
 termEq t1 t2 = t1 == t2
+
 infix 4 ?=
+
 (?=) = termEq
 
-checkTypeOld :: [ContextElement] -> Term -> Maybe Term
-checkTypeOld ctx (Var x) = find (\e -> elName e == x) ctx >>= return . ty
-checkTypeOld ctx (Const _ t) = do
-  checkTypeOld ctx t
-  return t -- it's just 't', as long as t itself is well typed
-checkTypeOld ctx (Abs (x, t) tt) = checkTypeOld (Elem x t : ctx) tt >>= Just . Func (x, t)
-checkTypeOld ctx (App t1 t2) = case (checkTypeOld ctx t1, checkTypeOld ctx t2) of
-  (Just (Func (p, ct1) rt), Just ct2) -> if ct1 ?= ct2 then Just $ subs rt p t2 else Nothing
-  _ -> Nothing
-checkTypeOld ctx (Match m (x : xs)) =
+-- TO THINK ABOUT
+-- - interpretting it as logic (for all ....)
+-- - next consideration: how to get it to work with functions which evaluate types?
+
+checkType :: [NamedTerm] -> [ContextElement] -> Term -> Maybe Term
+checkType _ ctx (Var x) = find (\e -> elName e == x) ctx >>= return . ty
+checkType terms ctx (Const _ t) = let evaled = eval terms t in 
+    do
+  checkType terms ctx evaled  
+  return evaled -- return evaluate type, as long as the type itself is well typed
+checkType terms ctx (Abs (x, t) tt) = checkType terms (Elem x t : ctx) tt >>= Just . Func (x, eval terms t)
+checkType terms ctx (App t1 t2) =
+  case (checkType terms ctx t1, checkType terms ctx t2) of
+    (Just (Func (p, ct1) rt), Just ct2) -> if eval terms ct1 ?= eval terms ct2 then Just $ subs rt p t2 else Nothing
+    _ -> Nothing
+checkType terms ctx (Match m (x : xs)) =
   ( do
       -- first get the expected left hand side type
-      ct <- checkTypeOld ctx m
+      ct <- fmap (eval terms) $ checkType terms ctx m
       -- handle the first (term, term)
-      (it1, ictx1) <- inferTypes ct (eval [] $ fst x) -- eval to ensure it's in normal form
+      (it1, ictx1) <- inferTypes ct (eval terms $ fst x) -- eval to ensure it's in normal form
       -- check that the infered type is correct, and return the right hand side type
-      rt <- (if it1 ?= ct then checkTypeOld (ictx1 <> ctx) (snd x) else Nothing)
+      rt <- (if it1 ?= ct then checkType terms (ictx1 <> ctx) (snd x) else Nothing)
       -- fold over the rest of the list
       foldl
         ( \macc -> \(l, r) ->
@@ -214,9 +197,9 @@ checkTypeOld ctx (Match m (x : xs)) =
               Just acc ->
                 ( do
                     -- get (infered type, infered context) from left hand side
-                    (it, ictx) <- inferTypes ct (eval [] l)
-                    ctr <- checkTypeOld (ictx <> ctx) r
-                    (if it ?= ct && acc ?= ctr
+                    (it, ictx) <- inferTypes ct (eval terms l)
+                    ctr <- checkType terms (ictx <> ctx) r
+                    ( if it ?= ct && acc ?= ctr
                         then Just acc
                         else Nothing
                       )
@@ -225,18 +208,15 @@ checkTypeOld ctx (Match m (x : xs)) =
         (Just rt)
         xs
   )
-checkTypeOld _ (Match _ []) = Nothing
-checkTypeOld _ Type0 = Just Type1
-checkTypeOld _ Type1 = Just Type2
-checkTypeOld _ Type2 = Nothing
-checkTypeOld ctx (Func (p, t1) t2) =
+checkType _ _ (Match _ []) = Nothing -- can't have empty match
+checkType _ _ Type0 = Just Type1
+checkType _ _ Type1 = Just Type2
+checkType _ _ Type2 = Nothing
+checkType terms ctx (Func (p, t1) t2) =
   do
-    ct1 <- checkTypeOld ctx t1
-    ct2 <- checkTypeOld (Elem p t1 : ctx) t2 -- add parameter to context
+    ct1 <- checkType terms ctx t1
+    ct2 <- checkType terms (Elem p t1 : ctx) t2 -- add parameter to context
     coverType ct1 ct2
-
-checkType :: [Identifier] -> [ContextElement] -> Term -> Maybe Term 
-checkType terms ces t = checkTypeOld ces t >>= return . eval terms
 
 -- helper function for calculating Func type
 coverType :: Term -> Term -> Maybe Term
@@ -248,19 +228,29 @@ coverType Type0 _ = Just Type0
 coverType _ Type0 = Just Type0
 coverType _ _ = Nothing
 
--- Tests
-{-
-prod = Const "Prod" (Func Type0 (Func Type0 Type0))
-mkprod = Abs ("A", Type0) (Abs ("B", Type0) (Const "mkprod" (Func (Var "A") (Func (Var "B") (App (App prod (Var "A")) (Var "B"))))))
 
-first = Abs ("x", App (App prod natural) natural)
 
-prod12 = App mkprod natural
+-- eval and checktype
+evalAndCT :: [NamedTerm] -> [ContextElement] -> Term -> Maybe Term
+evalAndCT terms ctx e = do
+  checkType terms ctx e 
+  return $ eval terms e
 
-natural :: Term
-natural = Const "Nat" Type0
-z = Const "Zero" natural
-s = Const "Succ" (Func natural natural)
+-- takes terms in REVERSE order
+evalAndCTNamed :: [NamedTerm] -> [ContextElement] -> Either NamedTerm [NamedTerm]
+evalAndCTNamed [] _ = Right []
+evalAndCTNamed (x : xs) ctx = do 
+  finTerms <- evalAndCTNamed xs ctx
+  let subsCtx = map (\(Elem name e) -> Elem name (subsAll finTerms e)) ctx in
+    let subsE = subsAll finTerms (term x) in
+      case evalAndCT finTerms subsCtx subsE of
+        Nothing -> Left (Named (name x) subsE)
+        Just e -> Right (Named (name x) e : finTerms)
 
-minusone = Abs ("n", natural) (Match (Var "n") [(z, z), (App s (Var "m"), Var "m")])
--}
+subsAll :: [NamedTerm] -> Term -> Term 
+subsAll terms e = foldl (\acc -> \(Named name ne) -> subs acc name ne) e terms
+
+evalFinal :: [NamedTerm] -> [ContextElement] -> Term -> Either NamedTerm Term 
+evalFinal terms ctx e = do
+  finTerms <- evalAndCTNamed (reverse terms) ctx
+  return $ eval finTerms e

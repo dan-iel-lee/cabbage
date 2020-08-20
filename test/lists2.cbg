@@ -19,6 +19,6 @@ def ConsN = (Cons) Nat
 
 def head =
   \(A: Type0). \(l: (List) A). match l with
-    | (Cons) a -> a;
+    | (((Cons) A) a) tail -> a;
 
 ((head) Nat) ((ConsN) Zero) NilN

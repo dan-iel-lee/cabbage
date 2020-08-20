@@ -9,7 +9,7 @@ const False : Bool
 
 def minusOne= \(n: Nat). match n with 
   | Zero -> Zero 
-  | (Succ) m -> m 
+  | (Succ) m -> m; 
 
 def twice = \(A: Type0). \(f: {A} -> A). \(a: A).
   (f) (f) a 

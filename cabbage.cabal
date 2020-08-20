@@ -31,6 +31,7 @@ library
       Helpers
       Lib
       Parser
+      Repl
   other-modules:
       Paths_cabbage
   hs-source-dirs:

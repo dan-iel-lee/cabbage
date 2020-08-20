@@ -19,6 +19,6 @@ def NatProd = ((MkProd) Nat) Nat
 rec lessThan : {Nat} -> {Nat} -> Bool = \(x: Nat). \(y: Nat). match ((NatProd) x) y with
   | ((NatProd) Zero) b -> True 
   | ((NatProd) a) Zero -> False 
-  | ((NatProd) (Succ) n) (Succ) m -> ((lessThan) n) m;
+  | ((NatProd) (Succ) n) (Succ) m -> ((lessThan) n) ml
 
 ((lessThan) three) two

@@ -17,11 +17,19 @@ def ListN = (List) Nat
 def NilN = (Nil) Nat 
 def ConsN = (Cons) Nat
 
-rec nthEl : {(A: Type0)} -> {(List) A} -> {Nat} -> A =
+sig nthEl : {(A: Type0)} -> {(List) A} -> {Nat} -> A
+def nthEl =
   \(A: Type0). \(l: (List) A). \(n: Nat). match n with
     | Zero -> match l with
-      | ((Cons) a) tail -> a; 
+      | (((Cons) A) a) tail -> a; 
     | (Succ) m -> match l with 
-      | ((Cons) a) tail -> (((nthEl) A) tail) m;;
+      | (((Cons) A) a) tail -> (((nthEl) A) tail) m;;
 
-(((nthEl) Nat) ((ConsN) Zero) NilN) Zero
+def four = (Succ) three
+
+sig nNats : {Nat} -> (List) Nat
+def nNats = \(n: Nat). match n with 
+  | Zero -> ((ConsN) Zero) NilN 
+  | (Succ) m -> ((ConsN) n) (nNats) m;
+
+(((nthEl) Nat) (nNats) four) Zero

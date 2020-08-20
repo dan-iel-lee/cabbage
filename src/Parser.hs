@@ -11,7 +11,7 @@ import Data.Functor.Identity (Identity)
 import DepTypes
 import Helpers
 
-type Parser = Parsec String ([ContextElement], [Identifier])
+type Parser = Parsec String ([ContextElement])
 
 
 reservedNames = [
@@ -32,7 +32,7 @@ reservedOps = [
   ";",
   "."]
 
-langDef :: Tok.LanguageDef ([ContextElement], [Identifier])
+langDef :: Tok.LanguageDef ([ContextElement])
 langDef  = Tok.LanguageDef
   {
     Tok.commentStart = ""
@@ -48,7 +48,7 @@ langDef  = Tok.LanguageDef
   , Tok.caseSensitive   = True
   }
 
-lexer :: Tok.TokenParser ([ContextElement], [Identifier])
+lexer :: Tok.TokenParser ([ContextElement])
 lexer = Tok.makeTokenParser langDef
 
 parens :: Parser a -> Parser a
@@ -71,6 +71,7 @@ symbol s = Tok.symbol lexer s
 
 -- parse wrapper to check type after parsing a term 
 -- # TODO: make sure recursive type definition matches actual type
+{-
 checkTypeParse :: Parser Term -> Parser Term 
 checkTypeParse p = do
   e <- p
@@ -81,7 +82,7 @@ checkTypeParse p = do
     Just ty -> (do 
           modifyState (\_ -> ((fmap (\h -> Elem (name h) ty) $ listToMaybe arr) `consMaybe` ces, arr))
           return e))
-
+-}
 {-|
 prefixOp :: String -> (a -> a) -> Ex.Operator String () Identity a
 prefixOp s f = Ex.Prefix (reservedOp s >> return f)
@@ -125,24 +126,35 @@ constParserHelper = do
     exprParser)
   return (name, ty)
 
+{-
 constParser :: Parser Term 
 constParser = try (do
   (name, ty) <- constParserHelper
   return (Const name ty))
+  -}
 
-constDecParser :: Parser Identifier
+constDecParser :: Parser NamedTerm
 constDecParser = do
   (name, ty) <- constParserHelper
   return (Named name (Const name ty))
 
-namedDecParser :: Parser Identifier 
+namedDecParser :: Parser NamedTerm 
 namedDecParser = do
   reserved "def"
   name <- ident
-  reserved "="
+  reservedOp "="
   expr <- exprParser
   return (Named name expr)
 
+signatureParser :: Parser () 
+signatureParser = do
+  reserved "sig"
+  name <- ident 
+  reservedOp ":"
+  ty <- exprParser 
+  modifyState ((:) (Elem name ty))
+
+{-
 recursiveDefParser = do
   reserved "rec"
   name <- ident 
@@ -152,7 +164,7 @@ recursiveDefParser = do
   reserved "="
   expr <- exprParser 
   return (Named name expr)
-
+-}
 
 
 -- EXPRESSION PARSERS
@@ -197,6 +209,7 @@ matchParser = try (do
   return (Match matchee cases))
 
 -- basic named/var parsers
+{-
 namedOrValParser :: Parser Term 
 namedOrValParser = try (do
   name <- ident
@@ -205,6 +218,7 @@ namedOrValParser = try (do
     Just t -> return t
     Nothing -> fail $ "Function " <> name <> " doesn't exist")
   return term)
+  -}
 
 type0Parser :: Parser Term 
 type0Parser = try(do
@@ -223,49 +237,42 @@ exprParser = choice [
     , appParser
     , absParser 
     , matchParser
-    , namedOrValParser
+--  , namedOrValParser
 --  , constParser
     , funcTypeParser
     , varParser]
   
 
 -- Parse declarations
-decParse :: Parser Term
-decParse = do
-  dec <- constDecParser
-    <|> namedDecParser
-    <|> recursiveDefParser
-  modifyState (\(ce, arr) -> (ce, (Named (name dec) (eval [] $ term dec) : arr))) -- evaluating
-  checkTypeParse (return (term dec)) -- check type before... 
-  return (term dec)
+decParse :: Parser (Maybe NamedTerm)
+decParse = fmap Just constDecParser
+    <|> fmap Just namedDecParser
+    <|> fmap (\_ -> Nothing) signatureParser
+--modifyState (\(ce, arr) -> (ce, (Named (name dec) (eval [] $ term dec) : arr))) -- evaluating
+--checkTypeParse (return (term dec)) -- check type before...
 
-allDecParse :: Parser ()
+allDecParse :: Parser [NamedTerm]
 allDecParse = do 
-  many decParse
-  return ()
+  maybes <- many decParse
+  return $ catMaybes maybes
 
-finalParse :: Parser Term 
+finalParse :: Parser ([NamedTerm], [ContextElement], Term) 
 finalParse = do
-  allDecParse 
-  many (char '\n')
-  expr <- checkTypeParse exprParser
-  (_, vars) <- getState
-  return $ eval vars expr
+  allTerms <- allDecParse 
+  expr <- exprParser
+  ctx <- getState
+  return $ (allTerms, ctx, expr)
 
 
-testParser s = runParser exprParser ([], []) "" s
 
 
-parseFinalExp :: String -> Either ParseError Term
-parseFinalExp s = runParser finalParse ([], []) "" s
+parseFinalExp :: String -> Either ParseError ([NamedTerm], [ContextElement], Term) 
+parseFinalExp s = runParser finalParse [] "" s
 
-parseExpFromFile :: FilePath -> IO (Either ParseError Term)
+parseExpFromFile :: FilePath -> IO (Either ParseError ([NamedTerm], [ContextElement], Term) )
 parseExpFromFile fpath = do 
   input <- readFile fpath 
   return (parseFinalExp input)
-
-
-
 
 
 
@@ -296,5 +303,7 @@ contents p = do
 
 
 -- helper to find a term named such
-findNamed :: String -> ([ContextElement], [Identifier]) -> Maybe Term 
+{-
+findNamed :: String -> ([ContextElement], [NamedTerm]) -> Maybe Term 
 findNamed s (_, arr) = listToMaybe $ mapMaybe (\(Named name t) -> if name == s then Just t else Nothing) arr
+-}
